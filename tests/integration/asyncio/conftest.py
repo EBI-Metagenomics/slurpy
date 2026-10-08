@@ -16,7 +16,7 @@ def event_loop():
     loop.close()
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="module")
 async def jwt_token(slurm_cluster) -> str:
     """
     Generate a JWT token for the 'slurm' user using scontrol inside the container.
@@ -26,7 +26,7 @@ async def jwt_token(slurm_cluster) -> str:
     # Execute scontrol command inside the container to generate JWT token
     result, error, exit_code = compose.exec_in_container(
         ["scontrol", "token", "username=slurm"],
-        "slurm_node",
+        slurm_cluster["service"],
     )
 
     if exit_code:
@@ -42,7 +42,7 @@ async def jwt_token(slurm_cluster) -> str:
     raise RuntimeError(f"Failed to extract JWT token from scontrol output: {output}")
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="module")
 async def slurm_config(slurm_cluster, jwt_token) -> Dict[str, Any]:
     """
     Provide complete Slurm configuration for async tests.

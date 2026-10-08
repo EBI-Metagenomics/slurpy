@@ -37,6 +37,11 @@ testcontainers = "^4.0.0"
 pytest = "^7.4.0"
 pytest-asyncio = "^0.21.0"
 
+[tool.pytest.ini_options]
+markers = [
+    "slurm_release(release): Slurm release of the cluster to test against (default 24.11)",
+]
+
 [tool.ruff.lint]
 ignore = ["E721"]
 

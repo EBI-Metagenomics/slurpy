@@ -31,11 +31,12 @@ echo "ℹ️ Start slurm worker daemon"
 slurmd -vvv
 
 export SLURM_JWT=daemon
-# Disabling security checks for slurmrestd since we're running it locally (otherwise a separate user would be needed)
-export SLURMRESTD_SECURITY=disable_unshare_sysv,disable_unshare_files,disable_user_check
+# Disabling security checks for slurmrestd since we're running it locally
+export SLURMRESTD_SECURITY=disable_unshare_sysv,disable_unshare_files
 
 echo "ℹ️ Start slurm rest api daemon"
-slurmrestd 0.0.0.0:6820 > /var/log/slurm/slurmrestd.log 2>&1 &
+# slurmrestd refuses to run as root or SlurmUser, and 26.05 release builds abort on disable_user_check
+gosu slurmrestd slurmrestd 0.0.0.0:6820 > /var/log/slurm/slurmrestd.log 2>&1 &
 
 
 tail -f /var/log/slurm/slurmdbd.log /var/log/slurm/slurmd.log /var/log/slurm/slurmctld.log /var/log/slurm/slurmrestd.log

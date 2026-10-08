@@ -6,7 +6,7 @@ from typing import Dict, Any
 import pytest
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def jwt_token(slurm_cluster) -> str:
     """
     Generate a JWT token for the 'slurm' user using scontrol inside the container.
@@ -16,7 +16,7 @@ def jwt_token(slurm_cluster) -> str:
     # Execute scontrol command inside the container to generate JWT token
     result, error, exit_code = compose.exec_in_container(
         ["scontrol", "token", "username=slurm"],
-        "slurm_node",
+        slurm_cluster["service"],
     )
 
     if exit_code:
@@ -32,7 +32,7 @@ def jwt_token(slurm_cluster) -> str:
     raise RuntimeError(f"Failed to extract JWT token from scontrol output: {output}")
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def slurm_config(slurm_cluster, jwt_token) -> Dict[str, Any]:
     """
     Provide complete Slurm configuration for sync tests.

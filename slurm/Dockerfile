@@ -5,6 +5,7 @@ RUN groupadd -r slurm
 RUN useradd -rm -d /home/slurm -s /bin/bash -g slurm -G sudo slurm
 RUN mkdir -p /home/slurm && chown -R slurm:slurm /home/slurm
 RUN useradd -rms /bin/bash munge
+RUN useradd -M -r -s /usr/sbin/nologin -U slurmrestd
 
 RUN apt -y update && apt -y upgrade && apt -y install curl nano wget zip bzip2 rsync build-essential
 
@@ -23,10 +24,12 @@ RUN apt-get install -y \
     libmariadb-dev \
     libmariadb-dev-compat \
     lua5.4 \
+    pkgconf \
     dbus
 
-RUN curl -sL https://download.schedmd.com/slurm/slurm-24.11.6.tar.bz2 | tar -xj
-RUN cd slurm-24.11.6 && \
+ARG SLURM_VERSION=24.11.6
+RUN curl -sL https://download.schedmd.com/slurm/slurm-${SLURM_VERSION}.tar.bz2 | tar -xj
+RUN cd slurm-${SLURM_VERSION} && \
     ./configure --sysconfdir=/etc/slurm && \
     make install -j16
 

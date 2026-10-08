@@ -65,7 +65,8 @@ slurpy/
 │   │       ├── api/              # Async API modules
 │   │       └── models/           # Async model classes
 │   ├── v0041/                 # Sync + async clients for v0.0.41
-│   └── v0042/                 # Sync + async clients for v0.0.42
+│   ├── v0042/                 # Sync + async clients for v0.0.42
+│   └── v0045/                 # Sync + async clients for v0.0.45
 ├── tools/                     # Development tools
 │   └── generate_versioned_clients.py  # Client generation script
 ├── tests/                     # Test suite
@@ -76,14 +77,16 @@ slurpy/
 │       │   ├── conftest.py   # Async-specific fixtures
 │       │   ├── test_v0040.py # Async tests for v0.0.40
 │       │   ├── test_v0041.py # Async tests for v0.0.41
-│       │   └── test_v0042.py # Async tests for v0.0.42
+│       │   ├── test_v0042.py # Async tests for v0.0.42
+│       │   └── test_v0045.py # Async tests for v0.0.45
 │       └── sync/             # Sync integration tests
 │           ├── conftest.py   # Sync-specific fixtures
 │           ├── test_v0040.py # Sync tests for v0.0.40
 │           ├── test_v0041.py # Sync tests for v0.0.41
-│           └── test_v0042.py # Sync tests for v0.0.42
+│           ├── test_v0042.py # Sync tests for v0.0.42
+│           └── test_v0045.py # Sync tests for v0.0.45
 ├── slurm/                    # Docker compose setup for testing
-│   ├── docker-compose.yaml   # Slurm cluster for integration tests
+│   ├── docker-compose.yaml   # Slurm clusters (24.11 and 26.05) for integration tests
 │   └── ...                   # Slurm configuration files
 ├── pyproject.toml            # Project configuration and dependencies
 ├── README.md                 # User documentation
@@ -114,6 +117,9 @@ python tools/generate_versioned_clients.py
 # Generate with different api url
 python tools/generate_versioned_clients.py --api-url http://example.com/openapi/v3
 
+# Generate only specific versions
+python tools/generate_versioned_clients.py --versions v0045
+
 # Generate with specific output directory
 python tools/generate_versioned_clients.py --output-dir ./my_output
 
@@ -138,21 +144,29 @@ To add support for a new Slurm API version:
 1. **Update the generator script**:
    ```python
    # In tools/generate_versioned_clients.py
-   VERSIONS = ["v0040", "v0041", "v0042", "v0043"]  # Add new version
+   VERSIONS = ["v0040", "v0041", "v0042", "v0045", "v0046"]  # Add new version
    ```
 
-2. **Ensure the OpenAPI spec is available**:
+2. **Run a Slurm release that serves the version**:
+   - Each Slurm release only serves a few API versions (e.g. 24.11 serves v0.0.40–v0.0.42, 26.05 serves v0.0.42–v0.0.45).
+     See the [OpenAPI plugin release notes](https://slurm.schedmd.com/openapi_release_notes.html).
+   - If no cluster in `slurm/docker-compose.yaml` serves it, add one: copy the `slurm_db_26_05`/`slurm_node_26_05`
+     services with a new `SLURM_VERSION` build arg, network, volumes and host port, and register it in
+     `SLURM_RELEASES` in `tests/conftest.py`.
+
+3. **Ensure the OpenAPI spec is available**:
    - The script expects specs at URLs like: `http://example.com/openapi/v3`
    - Or provide local spec files
 
-3. **Run the generator**:
+4. **Run the generator** for just the new version, so existing clients are not regenerated from a different Slurm release:
    ```bash
-   poetry run python tools/generate_versioned_clients.py
+   poetry run python tools/generate_versioned_clients.py --api-url http://localhost:<port>/openapi/v3 --versions v0046
    ```
 
-4. **Create integration tests**:
-   - Copy existing test files from `tests/integration/sync/test_v0042.py` and `tests/integration/asyncio/test_v0042.py`
+5. **Create integration tests**:
+   - Copy existing test files from `tests/integration/sync/test_v0045.py` and `tests/integration/asyncio/test_v0045.py`
    - Update the version imports and test class names
+   - Set the module's `pytestmark = pytest.mark.slurm_release(...)` to the Slurm release that serves the version
    - Test with a real Slurm cluster for both sync and async variants
 
 ## Testing
@@ -208,9 +222,10 @@ poetry run pytest tests/integration/asyncio/test_v0040.py::TestSlurmV0040::test_
 Integration tests use **testcontainers** to spin up a real Slurm cluster:
 
 1. **Docker must be running**
-2. **Ports 3306 and 6820 must be available**
+2. **Ports 3306, 6820 and 6821 must be available**
 3. **Tests automatically**:
-   - Start MariaDB and Slurm containers
+   - Start MariaDB and Slurm containers for each Slurm release the selected tests need
+     (24.11 by default, or the one set by a module's `slurm_release` marker)
    - Generate JWT tokens using `scontrol`
    - Run API tests against the live cluster
    - Clean up containers when done
@@ -328,9 +343,9 @@ The `.pre-commit-config.yaml` includes:
 The project includes a Docker Compose setup for running integration tests:
 
 ```bash
-# Start the Slurm cluster (manual testing)
+# Start the Slurm cluster (manual testing); use slurm_node_26_05 for the 26.05 cluster
 cd slurm/
-docker-compose up -d
+docker-compose up -d slurm_node
 
 # Check logs
 docker-compose logs -f slurm_node
@@ -342,7 +357,8 @@ docker-compose down
 ### Cluster Components
 
 - **slurm_db**: MariaDB database for Slurm accounting
-- **slurm_node**: Single-node Slurm cluster (controller + compute + REST API)
+- **slurm_node**: Single-node Slurm 24.11 cluster (controller + compute + REST API), on port 6820. Serves v0.0.40–v0.0.42.
+- **slurm_db_26_05** / **slurm_node_26_05**: The same setup on Slurm 26.05, on port 6821. Serves v0.0.42–v0.0.45.
 
 ### Manual API Testing
 
@@ -356,6 +372,12 @@ docker-compose exec slurm_node scontrol token username=slurm
 curl -H "X-SLURM-USER-NAME: slurm" \\
      -H "X-SLURM-USER-TOKEN: <your-jwt-token>" \\
      http://localhost:6820/slurm/v0.0.40/ping
+
+# Same for the 26.05 cluster
+docker-compose exec slurm_node_26_05 scontrol token username=slurm
+curl -H "X-SLURM-USER-NAME: slurm" \\
+     -H "X-SLURM-USER-TOKEN: <your-jwt-token>" \\
+     http://localhost:6821/slurm/v0.0.45/ping/
 ```
 
 ## Making Changes

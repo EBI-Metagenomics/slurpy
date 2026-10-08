@@ -4,7 +4,7 @@ Script to generate version-specific Slurm API clients by filtering OpenAPI opera
 
 This script:
 1. Fetches the OpenAPI specification from a Slurm REST API endpoint
-2. Analyzes operation IDs to group them by API version (v0040, v0041, v0042)
+2. Analyzes operation IDs to group them by API version (see VERSIONS)
 3. Generates separate Python clients for each version using openapi-generator-cli
 4. Uses the --openapi-normalizer FILTER to include only version-specific operations
 """
@@ -25,6 +25,10 @@ from typing import Dict, List, Union
 
 import httpx
 
+# A Slurm release only serves a few of these (e.g. 26.05 serves v0042-v0045),
+# so use --versions to pick ones served by the cluster you generate from.
+VERSIONS = ["v0040", "v0041", "v0042", "v0045"]
+
 
 class SlurmClientGenerator:
     """Generator for version-specific Slurm API clients."""
@@ -41,18 +45,15 @@ class SlurmClientGenerator:
         self.version_models: Dict[str, List[str]] = defaultdict(list)
         self.logger = logging.getLogger(__name__)
 
-        # API version patterns to match operations
+        # API version patterns to match operations (util_* operations were added in v0044)
         self.version_patterns = {
-            "v0040": re.compile(r"slurm(?:db)?_v0040_"),
-            "v0041": re.compile(r"slurm(?:db)?_v0041_"),
-            "v0042": re.compile(r"slurm(?:db)?_v0042_"),
+            version: re.compile(rf"(?:slurm(?:db)?|util)_{version}_")
+            for version in VERSIONS
         }
 
         # Model version patterns to match model names (actual format: v0.0.40_*)
         self.model_patterns = {
-            "v0040": re.compile(r"^v0\.0\.40_"),
-            "v0041": re.compile(r"^v0\.0\.41_"),
-            "v0042": re.compile(r"^v0\.0\.42_"),
+            version: re.compile(rf"^v0\.0\.{int(version[1:])}_") for version in VERSIONS
         }
 
     def fetch_openapi_spec(self) -> Dict:
@@ -349,7 +350,7 @@ class SlurmClientGenerator:
             version_code = version[-4:]  # Extract 0040, 0041, 0042
             if f"_v{version_code}_" in operation_id:
                 clean_name = re.sub(
-                    rf"^slurm(?:db)?_v{version_code}_", "", operation_id
+                    rf"^(?:slurm(?:db)?|util)_v{version_code}_", "", operation_id
                 )
                 mappings.append(f"{operation_id}={clean_name}")
 
@@ -581,7 +582,7 @@ def main():
     parser.add_argument(
         "--versions",
         nargs="+",
-        choices=["v0040", "v0041", "v0042"],
+        choices=VERSIONS,
         help="Only generate clients for specified versions",
     )
     parser.add_argument(

@@ -7,7 +7,7 @@ This Python client is a convenience library for interacting with that API.
 
 ## Features
 
-- ✨ **Multiple API versions** - Support for Slurm REST API v0.0.40, v0.0.41, and v0.0.42
+- ✨ **Multiple API versions** - Support for Slurm REST API v0.0.40, v0.0.41, v0.0.42, and v0.0.45
 - 🔐 **JWT Authentication** - Built-in support for Slurm JWT token authentication
 - 🚀 **Sync & Async** - Both synchronous and asynchronous client support
 - 🐍 **Type Hints** - Complete type annotations for better IDE support
@@ -117,7 +117,15 @@ configuration.api_key['token'] = os.getenv("SLURM_USER_TOKEN")
 
 ## API Versions
 
-Slurpy supports multiple Slurm REST API versions, each available in both sync and async variants:
+Slurpy supports multiple Slurm REST API versions, each available in both sync and async variants.
+Use a version that your Slurm cluster serves:
+
+| API version | Served by Slurm |
+|-------------|-----------------|
+| v0.0.40 | 23.11 – 25.05 |
+| v0.0.41 | 24.05 – 25.11 |
+| v0.0.42 | 24.11 – 26.05 |
+| v0.0.45 | 26.05 |
 
 ### v0.0.40
 ```python
@@ -144,6 +152,23 @@ import slurpy.v0042 as slurpy
 
 # Asynchronous
 import slurpy.v0042.asyncio as slurpy
+```
+
+### v0.0.45
+```python
+# Synchronous
+import slurpy.v0045 as slurpy
+
+# Asynchronous
+import slurpy.v0045.asyncio as slurpy
+```
+
+v0.0.45 also has a `UtilApi`, for converting between hostlist expressions and host names:
+
+```python
+util = slurpy.UtilApi(client)
+response = util.post_hostnames(slurpy.OpenAPIHostlistReqResp(hostlist="node[1-3]"))
+print(response.hostnames)  # ['node1', 'node2', 'node3']
 ```
 
 > **Note:** The API interface is consistent across versions and between sync/async variants, but some features and response formats may differ between Slurm versions. Check the Slurm documentation for version-specific differences.

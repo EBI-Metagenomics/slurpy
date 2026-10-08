@@ -36,7 +36,55 @@ services:
     ports:
       - "6820:6820"
 
+  # Slurm 26.05, for API versions 24.11 does not serve. Its own network and the
+  # slurm_db alias let it share configs/ with the cluster above.
+  slurm_db_26_05:
+    image: mariadb:latest
+    container_name: slurm_db_26_05
+    environment:
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+      MYSQL_DATABASE: slurm
+      MYSQL_USER: slurm
+      MYSQL_PASSWORD: slurm
+    volumes:
+      - db_26_05:/var/lib/mysql
+    networks:
+      slurm_26_05:
+        aliases:
+          - slurm_db
+    healthcheck:
+      test: ['CMD', '/usr/local/bin/healthcheck.sh', '--connect']
+      interval: 2s
+      timeout: 2s
+      retries: 5
+
+  slurm_node_26_05:
+    build:
+      context: .
+      args:
+        SLURM_VERSION: "26.05.4"
+    command: ["slurmd"]
+    hostname: slurm_node
+    container_name: slurm_node_26_05
+    depends_on:
+      slurm_db_26_05:
+        condition: service_healthy
+    volumes:
+      - munge_26_05:/etc/munge
+      - logs_26_05:/var/log/slurm
+      - "./entrypoints/entrypoint.sh:/usr/local/bin/entrypoint.sh"
+    networks:
+      - slurm_26_05
+    ports:
+      - "6821:6820"
+
+networks:
+  slurm_26_05:
+
 volumes:
   db:
   munge:
   logs:
+  db_26_05:
+  munge_26_05:
+  logs_26_05:
